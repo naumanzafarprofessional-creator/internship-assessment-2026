@@ -216,3 +216,33 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+
+# Standard LaTeX cruft (often generated in your project build dir or current directory)
+*.aux
+*.bbl
+*.blg
+*.dvi
+*.log
+*.out
+
+# BibTeX database file (optional, depends on tools)
+*.db
+
+# Ignore temp folders according to OS or your editor
+**/ (*.aux* )  # Ignores all .aux files recursively, very strong
+
+# Windows Temp directory (uncomment if likely the case for your editor)
+*C:/Users/your_username/AppData/Local/Microsoft/*/Temp/?
+
+# Generic temp files
+*.*
+
+# CMake, etc. build output
+build/
+dist/
+
+# Project-specific IDE dirs (example for VS Code)
+.clang_complete
+
+

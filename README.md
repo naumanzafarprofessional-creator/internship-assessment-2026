@@ -5,15 +5,13 @@ Welcome to the internship assessment repository of the Parallel Computing and Ne
 ## Important Dates
 
 Task Release:
-22 June 2026
+29 June 2026
 10:00 AM
 
 Submission Deadline:
-24 June 2026
-11:59 PM
+01 July 2026
+10:00 AM
 
-Duration:
-62 Hours
 
 ## Available Tasks
 

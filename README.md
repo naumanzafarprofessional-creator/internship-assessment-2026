@@ -1,104 +1,130 @@
-# PCN Research Internship Assessment 2026
+# Task 2 — Weather Intelligence Knowledge Graph
 
-Welcome to the internship assessment repository of the Parallel Computing and Networks (PCN) Research Lab.
+Builds a knowledge graph of weather events across Pakistan and its
+neighbouring countries (India, Afghanistan, Iran, China/Xinjiang) using
+the Open-Meteo Archive API, with cross-border `UPSTREAM_OF` relationships
+linking weather events in neighbouring countries to related events in
+Pakistan within a documented lag window.
 
-## Important Dates
+## Requirements
 
-Task Release:
-29 June 2026
-10:00 AM
+- Python 3.10+
+- Neo4j (Desktop, or AuraDB free tier) running locally or remotely
+- Python packages: `requests`, `pandas`, `numpy`, `neo4j`
 
-Submission Deadline:
-01 July 2026
-10:00 AM
+```bash
+pip install requests pandas numpy neo4j
+```
 
+## Pipeline steps
 
-## Available Tasks
+### 1. Collect raw weather data
 
-Candidates must choose ONE task only.
+```bash
+cd collector
+python3 fetch_weather.py
+```
 
-### Task 1
-Disease Intelligence Knowledge Graph
+Pulls 3 years of daily weather data (temperature, precipitation, wind,
+humidity) for 18 locations across 5 countries from the Open-Meteo Archive
+API (no API key required). Output: `data/raw_weather.csv`.
 
-### Task 2
-Weather Intelligence Knowledge Graph
+Locations and date range are configured in `collector/config.py`.
 
-### Task 3
-Real-Time Multi-Source Data Integration (Producer--Consumer Pipeline)
+> **Note:** if you do not have internet access in your environment, you can
+> generate a synthetic dataset with the same schema for testing purposes:
+> `python3 generate_synthetic.py`. **Do not use this for the actual
+> submission** — it is for pipeline testing only, and is clearly marked as
+> such in the script itself.
 
-## Submission Process
+### 2. Extract weather events
 
-1. Fork this repository.
-2. Complete your selected task.
-3. Create a public GitHub repository containing your work.
-4. Submit the repository URL using the https://forms.gle/kP9fvTE1bspsVWFu5
-5. Repo naming convention PCN-Internship-2026-<YourName>
+```bash
+python3 extract_events.py
+```
 
-## Deliverables
+Converts the raw daily time series into discrete `WeatherEvent` entities
+(RainfallEvent, Flood, Heatwave, Drought, TemperatureEvent, WindEvent)
+using per-location statistical thresholds (documented in the script
+docstring and in the technical report). Output: `data/events.csv`.
 
-- Source Code
-- Technical Report
-- Knowledge Graph
-- Documentation
-- Demonstration Video
+### 3. Build the Neo4j graph
 
-#Required Repo strcutre
+Start Neo4j and set connection details (defaults shown):
 
-PCN-Internship-2026-YouName
-│
-├── README.md
+```bash
+export NEO4J_URI=bolt://localhost:7687
+export NEO4J_USER=neo4j
+export NEO4J_PASSWORD=<your password>
+```
 
-├─report
+```bash
+cd ../graph
+python3 build_graph.py
+```
 
-├  src
+This wipes any existing graph in the target database and rebuilds it from
+`data/raw_weather.csv` and `data/events.csv`, constructing:
 
-├── outputs
+- `Country`, `Location` nodes with `IN_COUNTRY` relationships
+- `WeatherEvent` nodes (typed via extra Neo4j labels, e.g. `:WeatherEvent:Heatwave`)
+  linked to their location via `OCCURRED_IN`
+- `Date` / `TimeWindow` nodes linked via `DURING`
+- Same-location temporal chains via `PRECEDED` / `FOLLOWED`
+- Cross-border `UPSTREAM_OF` relationships between neighbouring-country
+  events and their mapped Pakistan location(s), within a 1–5 day lag
+  window (see `UPSTREAM_PAIRS` and `UPSTREAM_LAG_DAYS` in
+  `graph/build_graph.py` for the documented geographic basis)
+- `ClimateIndicator` nodes (per-country, per-year, per-event-type
+  frequency) linked via `ASSOCIATED_WITH`
 
-├── dscrapped
+### 4. Run the analytical queries
 
-└── demo_video
+```bash
+cd ../queries
+python3 run_queries.py
+```
 
-#Report Structure
-1. Methodology
-2. Architecture
-3. KG Schema
-4. Results
-5. Challenges
-6. LLM Usage
-7. Declaration
+Runs all six required analytical queries against the graph and prints
+results. Use Neo4j Browser (`http://localhost:7474`) to additionally
+visualise the graph for the video demo.
 
+## Project structure
 
-## Use of LLMs
+```
+chip-task2/
+├── collector/
+│   ├── config.py              # locations, date range, API constants
+│   ├── fetch_weather.py       # Open-Meteo collector
+│   └── generate_synthetic.py  # testing-only synthetic data generator
+├── graph/
+│   ├── build_graph.py         # Neo4j graph construction
+│   └── dry_run_logic_check.py # testing-only logic validator (no Neo4j needed)
+├── queries/
+│   └── run_queries.py         # the 6 required analytical queries
+├── data/                      # raw_weather.csv, events.csv (generated)
+└── docs/                      # technical report, architecture diagram
+```
 
-LLMs may be used.
+## Known limitations / honest disclosures
 
-Candidates must clearly disclose:
+- **Event detection is threshold-based, not physically modelled.** Floods,
+  droughts, etc. are statistical outliers relative to each location's own
+  historical distribution, not validated against actual disaster records.
+  This is a deliberate scope trade-off documented in the technical report.
+- **`UPSTREAM_OF` pairing is a simplified geographic heuristic**
+  (`UPSTREAM_PAIRS` in `build_graph.py`), not genuine atmospheric or
+  river-basin modelling. Each pairing is individually justified (e.g.
+  Kabul → Peshawar/Multan via the Kabul River basin) but this is a
+  coarse approximation, not hydrological simulation.
+- **Drought detection may yield few or no events** depending on the
+  specific 3-year window pulled, since it requires a 14+ day low-precipitation
+  streak; this is expected to vary significantly between arid locations
+  (Quetta, Zahedan, Kashgar) and others. Reported transparently rather than
+  adjusting thresholds post hoc to force a target count.
 
-- Which LLMs were used
-- What tasks were assisted by LLMs
-- Any generated code or prompts
+## LLM use disclosure
 
-## Academic Integrity
+All Code files generated by claude. Planning and understanding of the project done from various sources including llms.
 
-Plagiarism will result in immediate disqualification
-
-#Declaratin to be submitted 
-I certify that this submission is my own work.
-
-I have disclosed all use of:
-
-- ChatGPT
-
-- Claude
-
-- Gemini
-
-- Copilot
-
-- Other LLMs
-
-I understand that plagiarism may result in disqualification.
-
-Name:
-
-Date:
+## Video Link
